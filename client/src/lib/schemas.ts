@@ -1,5 +1,27 @@
 import { z } from "zod";
 
+export const clarificationFieldSchema = z.object({
+    key: z.string(),
+    label: z.string(),
+    type: z.enum(["text", "select"]),
+    options: z.array(z.string()).optional(),
+});
+
+export const experimentSchema = z.object({
+    researchQuestion: z.string(),
+    instrument: z.string(),
+    timeframe: z.string(),
+    entryCondition: z.string(),
+    exitCondition: z.string(),
+    holdingPeriod: z.string(),
+    testPeriod: z.string(),
+    transactionCosts: z.string(),
+    filters: z.array(z.string()),
+    hypothesis: z.string(),
+});
+
+export type Experiment = z.infer<typeof experimentSchema>;
+
 export const researchAnalysisSchema = z.object({
     researchQuestion: z.string(),
 
@@ -21,11 +43,15 @@ export const researchAnalysisSchema = z.object({
 
     hypothesis: z.string(),
 
-    missingInformation: z.array(z.string()),
+    missingInformation: z.array(clarificationFieldSchema),
 
     status: z.enum(["needs_clarification", "ready"]),
 });
 
 export type ResearchAnalysis = z.infer<
     typeof researchAnalysisSchema
+>;
+
+export type ClarificationField = z.infer<
+    typeof clarificationFieldSchema
 >;

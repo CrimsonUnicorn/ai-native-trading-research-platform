@@ -24,7 +24,14 @@ The JSON must have exactly these fields:
   "transactionCosts": "string or null",
   "filters": ["string"],
   "hypothesis": "string",
-  "missingInformation": ["string"],
+  "missingInformation": [
+  {
+    "key": "string",
+    "label": "string",
+    "type": "text or select",
+    "options": ["string"]
+  }
+],
   "status": "needs_clarification or ready"
 }
 
@@ -32,6 +39,13 @@ Rules:
 - Do not invent important trading parameters.
 - If an important parameter is missing, use null.
 - Add every missing important parameter to "missingInformation".
+- Each missing information item must contain:
+  - key: a short machine-readable field name
+  - label: a human-readable question
+  - type: "select" when reasonable predefined choices exist, otherwise "text"
+  - options: provide 2-5 reasonable choices for select fields
+- Do not invent a user's answer.
+- Options are suggestions for the user to choose from, not assumptions.
 - Set status to "needs_clarification" when important information is missing.
 - Set status to "ready" only when enough information exists to define a meaningful experiment.
 `;
