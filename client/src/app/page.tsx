@@ -46,6 +46,8 @@ export default function Home() {
 
   const [analysis, setAnalysis] = useState<ResearchAnalysis | null>(null);
   const [experiment, setExperiment] = useState<Experiment | null>(null);
+  const [backtestResult, setBacktestResult] = useState<any>(null);
+  const [isRunning, setIsRunning] = useState(false);
 
   const handleAnalyze = async () => {
     if (!question.trim()) {
@@ -124,6 +126,44 @@ export default function Home() {
       );
     } finally {
       setIsBuilding(false);
+    }
+  };
+
+  const handleRunExperiment = async () => {
+    if (!experiment) return;
+
+    setIsRunning(true);
+    setError("");
+    setBacktestResult(null);
+
+    try {
+      const response = await fetch("/api/backtest", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          holdingDays: 3,
+          fallThresholdPercent: 1,
+          volatilityThreshold: 20,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to run experiment.");
+      }
+
+      setBacktestResult(data);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong while running the experiment.",
+      );
+    } finally {
+      setIsRunning(false);
     }
   };
 
@@ -322,6 +362,15 @@ export default function Home() {
                   {experiment.hypothesis}
                 </p>
               </div>
+            </div>
+            <div className="mt-8 border-t border-zinc-800 pt-6">
+              <button
+                onClick={handleRunExperiment}
+                disabled={isRunning}
+                className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isRunning ? "Running Experiment..." : "Run Experiment"}
+              </button>
             </div>
           </section>
         )}
