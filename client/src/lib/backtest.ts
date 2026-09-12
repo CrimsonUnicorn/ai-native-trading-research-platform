@@ -1,4 +1,5 @@
 import { MarketDataPoint } from "./mock-data";
+import { Experiment } from "./schemas";
 
 export interface BacktestTrade {
   entryDate: string;
@@ -6,7 +7,6 @@ export interface BacktestTrade {
   entryPrice: number;
   exitPrice: number;
   returnPercent: number;
-  volatility: "high" | "normal";
 }
 
 export interface BacktestResult {
@@ -16,58 +16,74 @@ export interface BacktestResult {
   winRate: number;
   averageReturn: number;
   totalReturn: number;
-  highVolatilityTrades: number;
-  normalVolatilityTrades: number;
-  highVolatilityAverageReturn: number;
-  normalVolatilityAverageReturn: number;
   trades: BacktestTrade[];
 }
 
-interface BacktestConfig {
-  holdingDays: number;
-  fallThresholdPercent: number;
-  volatilityThreshold: number;
+function extractNumber(value: string): number | null {
+  const match = value.match(/\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : null;
+}
+
+function getTradingDay(timestamp: string): string {
+  return timestamp.split("T")[0];
 }
 
 export function runBacktest(
   data: MarketDataPoint[],
-  config: BacktestConfig,
+  experiment: Experiment,
 ): BacktestResult {
+  const holdingPeriod =
+    extractNumber(experiment.holdingPeriod) ?? 1;
+
+  const fallThresholdPercent =
+    extractNumber(experiment.entryCondition) ?? 1;
+
   const trades: BacktestTrade[] = [];
 
-  for (let i = 1; i < data.length - config.holdingDays; i++) {
-    const previousDay = data[i - 1];
-    const currentDay = data[i];
+  let currentTradingDay = "";
+  let rollingDailyHigh = 0;
 
-    const dailyChange =
-      ((currentDay.close - previousDay.close) / previousDay.close) * 100;
+  for (
+    let i = 0;
+    i < data.length - holdingPeriod;
+    i++
+  ) {
+    const currentBar = data[i];
+    const tradingDay = getTradingDay(currentBar.timestamp);
+
+    if (tradingDay !== currentTradingDay) {
+      currentTradingDay = tradingDay;
+      rollingDailyHigh = currentBar.high;
+    } else {
+      rollingDailyHigh = Math.max(
+        rollingDailyHigh,
+        currentBar.high,
+      );
+    }
+
+    const entryPriceThreshold =
+      rollingDailyHigh *
+      (1 - fallThresholdPercent / 100);
 
     const isFall =
-      dailyChange <= -config.fallThresholdPercent;
+      currentBar.close <= entryPriceThreshold;
 
     if (!isFall) {
       continue;
     }
 
-    const entryIndex = i;
-    const exitIndex = i + config.holdingDays;
-
-    const entry = data[entryIndex];
-    const exit = data[exitIndex];
+    const entry = data[i];
+    const exit = data[i + holdingPeriod];
 
     const returnPercent =
       ((exit.close - entry.close) / entry.close) * 100;
 
     trades.push({
-      entryDate: entry.date,
-      exitDate: exit.date,
+      entryDate: entry.timestamp,
+      exitDate: exit.timestamp,
       entryPrice: entry.close,
       exitPrice: exit.close,
       returnPercent,
-      volatility:
-        entry.indiaVix > config.volatilityThreshold
-          ? "high"
-          : "normal",
     });
   }
 
@@ -85,30 +101,8 @@ export function runBacktest(
   );
 
   const averageReturn =
-    trades.length > 0 ? totalReturn / trades.length : 0;
-
-  const highVolatilityTrades = trades.filter(
-    (trade) => trade.volatility === "high",
-  );
-
-  const normalVolatilityTrades = trades.filter(
-    (trade) => trade.volatility === "normal",
-  );
-
-  const highVolatilityAverageReturn =
-    highVolatilityTrades.length > 0
-      ? highVolatilityTrades.reduce(
-          (sum, trade) => sum + trade.returnPercent,
-          0,
-        ) / highVolatilityTrades.length
-      : 0;
-
-  const normalVolatilityAverageReturn =
-    normalVolatilityTrades.length > 0
-      ? normalVolatilityTrades.reduce(
-          (sum, trade) => sum + trade.returnPercent,
-          0,
-        ) / normalVolatilityTrades.length
+    trades.length > 0
+      ? totalReturn / trades.length
       : 0;
 
   return {
@@ -121,10 +115,6 @@ export function runBacktest(
         : 0,
     averageReturn,
     totalReturn,
-    highVolatilityTrades: highVolatilityTrades.length,
-    normalVolatilityTrades: normalVolatilityTrades.length,
-    highVolatilityAverageReturn,
-    normalVolatilityAverageReturn,
     trades,
   };
 }

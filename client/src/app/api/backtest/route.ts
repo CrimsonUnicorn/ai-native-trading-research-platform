@@ -2,20 +2,19 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { mockMarketData } from "@/lib/mock-data";
 import { runBacktest } from "@/lib/backtest";
+import { experimentSchema } from "@/lib/schemas";
 
 const backtestRequestSchema = z.object({
-  holdingDays: z.number().int().positive().default(3),
-  fallThresholdPercent: z.number().positive().default(1),
-  volatilityThreshold: z.number().positive().default(20),
+  experiment: experimentSchema,
 });
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const config = backtestRequestSchema.parse(body);
+    const { experiment } = backtestRequestSchema.parse(body);
 
-    const result = runBacktest(mockMarketData, config);
+    const result = runBacktest(mockMarketData, experiment);
 
     return NextResponse.json({
       success: true,
@@ -28,7 +27,7 @@ export async function POST(request: Request) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         {
-          error: "Invalid backtest configuration.",
+          error: "Invalid experiment definition.",
           details: error.issues,
         },
         { status: 400 },
@@ -37,7 +36,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: "Failed to run backtest.",
+        error: "Failed to run experiment.",
         details:
           error instanceof Error ? error.message : String(error),
       },
