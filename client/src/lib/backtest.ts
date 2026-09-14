@@ -24,59 +24,47 @@ function extractNumber(value: string): number | null {
   return match ? Number(match[0]) : null;
 }
 
-function getTradingDay(timestamp: string): string {
-  return timestamp.split("T")[0];
-}
-
 export function runBacktest(
   data: MarketDataPoint[],
   experiment: Experiment,
 ): BacktestResult {
   const holdingPeriod =
-    extractNumber(experiment.holdingPeriod) ?? 1;
+    extractNumber(experiment.holdingPeriod) ?? 3;
 
   const fallThresholdPercent =
     extractNumber(experiment.entryCondition) ?? 1;
 
   const trades: BacktestTrade[] = [];
 
-  let currentTradingDay = "";
-  let rollingDailyHigh = 0;
-
   for (
-    let i = 0;
+    let i = 1;
     i < data.length - holdingPeriod;
     i++
   ) {
+    const previousBar = data[i - 1];
     const currentBar = data[i];
-    const tradingDay = getTradingDay(currentBar.timestamp);
 
-    if (tradingDay !== currentTradingDay) {
-      currentTradingDay = tradingDay;
-      rollingDailyHigh = currentBar.high;
-    } else {
-      rollingDailyHigh = Math.max(
-        rollingDailyHigh,
-        currentBar.high,
-      );
-    }
+    // Calculate percentage change from previous bar
+    const priceChangePercent =
+      ((currentBar.close - previousBar.close) /
+        previousBar.close) *
+      100;
 
-    const entryPriceThreshold =
-      rollingDailyHigh *
-      (1 - fallThresholdPercent / 100);
-
+    // Entry when price falls by the requested percentage
     const isFall =
-      currentBar.close <= entryPriceThreshold;
+      priceChangePercent <= -fallThresholdPercent;
 
     if (!isFall) {
       continue;
     }
 
-    const entry = data[i];
+    const entry = currentBar;
     const exit = data[i + holdingPeriod];
 
     const returnPercent =
-      ((exit.close - entry.close) / entry.close) * 100;
+      ((exit.close - entry.close) /
+        entry.close) *
+      100;
 
     trades.push({
       entryDate: entry.timestamp,
